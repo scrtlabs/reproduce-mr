@@ -81,6 +81,7 @@ func (m *memoryValue) Set(value string) error {
 }
 
 func main() {
+	const defaultMrKeyProvider = "0000000000000000000000000000000000000000000000000000000000000000"
 	var (
 		fwPath        string
 		kernelPath    string
@@ -90,6 +91,7 @@ func main() {
 		kernelCmdline string
 		jsonOutput    bool
 		metadataPath  string
+		mrKeyProvider string = defaultMrKeyProvider
 	)
 
 	flag.StringVar(&fwPath, "fw", "", "Path to firmware file")
@@ -100,6 +102,7 @@ func main() {
 	flag.StringVar(&kernelCmdline, "cmdline", "", "Kernel command line")
 	flag.BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 	flag.StringVar(&metadataPath, "metadata", "", "Path to DStack metadata.json file")
+	flag.StringVar(&mrKeyProvider, "mrkp", defaultMrKeyProvider, "Measurement of key provider")
 	flag.Parse()
 
 	// If metadata file is provided, read it and override other options
@@ -176,7 +179,7 @@ func main() {
 			RTMR0:     fmt.Sprintf("%x", measurements.RTMR0),
 			RTMR1:     fmt.Sprintf("%x", measurements.RTMR1),
 			RTMR2:     fmt.Sprintf("%x", measurements.RTMR2),
-			MrEnclave: measurements.CalculateMrEnclave(),
+			MrEnclave: measurements.CalculateMrEnclave(mrKeyProvider),
 			MrImage:   measurements.CalculateMrImage(),
 		}
 		jsonData, err := json.MarshalIndent(output, "", "  ")
@@ -190,7 +193,7 @@ func main() {
 		fmt.Printf("RTMR0: %x\n", measurements.RTMR0)
 		fmt.Printf("RTMR1: %x\n", measurements.RTMR1)
 		fmt.Printf("RTMR2: %x\n", measurements.RTMR2)
-		fmt.Printf("mr_enclave: %s\n", measurements.CalculateMrEnclave())
+		fmt.Printf("mr_enclave: %s\n", measurements.CalculateMrEnclave(mrKeyProvider))
 		fmt.Printf("mr_image: %s\n", measurements.CalculateMrImage())
 	}
 }

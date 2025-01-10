@@ -506,12 +506,19 @@ type TdxMeasurements struct {
 }
 
 // CalculateMrEnclave calculates mr_enclave = sha256(mrtd+rtmr0+rtmr1+rtmr2)
-func (m *TdxMeasurements) CalculateMrEnclave() string {
+func (m *TdxMeasurements) CalculateMrEnclave(mrKeyProvider string) string {
+	// Strip "0x" prefix if present
+	mrKeyProvider = strings.TrimPrefix(mrKeyProvider, "0x")
+	mrKeyProviderBytes, err := hex.DecodeString(mrKeyProvider)
+	if err != nil {
+		panic("invalid mr_key_provider")
+	}
 	h := sha256.New()
 	h.Write(m.MRTD)
 	h.Write(m.RTMR0)
 	h.Write(m.RTMR1)
 	h.Write(m.RTMR2)
+	h.Write(mrKeyProviderBytes)
 	return hex.EncodeToString(h.Sum(nil))
 }
 
