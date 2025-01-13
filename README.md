@@ -1,8 +1,8 @@
 # dstack-mr
 
-A CLI tool for calculating TDX (Intel Trust Domain Extensions) measurements for DStack images.
+A CLI tool for calculating TDX (Intel Trust Domain Extensions) measurements for Dstack images.
 
-This project is based on [oasis-cli](https://github.com/oasisprotocol/cli) and modified for specific TDX measurement requirements.
+This project is based on [oasis-cli](https://github.com/oasisprotocol/cli) and modified for Dstack-specific TDX measurement requirements.
 
 ## Installation
 
@@ -17,7 +17,7 @@ You can either specify files directly using command line options:
 dstack-mr -fw firmware.bin -kernel vmlinuz [options]
 ```
 
-Or use a DStack metadata.json file:
+Or use a Dstack metadata.json file:
 ```bash
 dstack-mr -metadata metadata.json [options]
 ```
