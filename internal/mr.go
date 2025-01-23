@@ -505,8 +505,8 @@ type TdxMeasurements struct {
 	RTMR2 []byte
 }
 
-// CalculateMrEnclave calculates mr_enclave = sha256(mrtd+rtmr0+rtmr1+rtmr2)
-func (m *TdxMeasurements) CalculateMrEnclave(mrKeyProvider string) string {
+// CalculateMrAggregated calculates mr_aggregated = sha256(mrtd+rtmr0+rtmr1+rtmr2+mr_key_provider)
+func (m *TdxMeasurements) CalculateMrAggregated(mrKeyProvider string) string {
 	// Strip "0x" prefix if present
 	mrKeyProvider = strings.TrimPrefix(mrKeyProvider, "0x")
 	mrKeyProviderBytes, err := hex.DecodeString(mrKeyProvider)

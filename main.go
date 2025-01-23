@@ -20,12 +20,17 @@ type DStackMetadata struct {
 }
 
 type measurementOutput struct {
-	MRTD      string `json:"mrtd"`
-	RTMR0     string `json:"rtmr0"`
-	RTMR1     string `json:"rtmr1"`
-	RTMR2     string `json:"rtmr2"`
-	MrEnclave string `json:"mr_enclave"`
-	MrImage   string `json:"mr_image"`
+	MRTD         string `json:"mrtd"`
+	RTMR0        string `json:"rtmr0"`
+	RTMR1        string `json:"rtmr1"`
+	RTMR2        string `json:"rtmr2"`
+	MrAggregated string `json:"mr_aggregated"`
+	MrImage      string `json:"mr_image"`
+}
+
+var knownKeyProviders = map[string]string{
+	"sgx-v0": "0x4888adb026ff91c1320c4f544a9f5d9e0561e13fc64947a10aa1556d0071b2cc",
+	"none":   "0x3369c4d32b9f1320ebba5ce9892a283127b7e96e1d511d7f292e5d9ed2c10b8c",
 }
 
 // parseMemorySize parses a human readable memory size (e.g., "1G", "512M") into megabytes
@@ -81,7 +86,7 @@ func (m *memoryValue) Set(value string) error {
 }
 
 func main() {
-	const defaultMrKeyProvider = "0000000000000000000000000000000000000000000000000000000000000000"
+	const defaultMrKeyProvider = "0x0000000000000000000000000000000000000000000000000000000000000000"
 	var (
 		fwPath        string
 		kernelPath    string
@@ -104,6 +109,11 @@ func main() {
 	flag.StringVar(&metadataPath, "metadata", "", "Path to DStack metadata.json file")
 	flag.StringVar(&mrKeyProvider, "mrkp", defaultMrKeyProvider, "Measurement of key provider")
 	flag.Parse()
+
+	// If the mrKeyProvider is in the knownKeyProviders, replace it with the value
+	if knownKeyProvider, ok := knownKeyProviders[mrKeyProvider]; ok {
+		mrKeyProvider = knownKeyProvider
+	}
 
 	// If metadata file is provided, read it and override other options
 	if metadataPath != "" {
@@ -175,12 +185,12 @@ func main() {
 
 	if jsonOutput {
 		output := measurementOutput{
-			MRTD:      fmt.Sprintf("%x", measurements.MRTD),
-			RTMR0:     fmt.Sprintf("%x", measurements.RTMR0),
-			RTMR1:     fmt.Sprintf("%x", measurements.RTMR1),
-			RTMR2:     fmt.Sprintf("%x", measurements.RTMR2),
-			MrEnclave: measurements.CalculateMrEnclave(mrKeyProvider),
-			MrImage:   measurements.CalculateMrImage(),
+			MRTD:         fmt.Sprintf("%x", measurements.MRTD),
+			RTMR0:        fmt.Sprintf("%x", measurements.RTMR0),
+			RTMR1:        fmt.Sprintf("%x", measurements.RTMR1),
+			RTMR2:        fmt.Sprintf("%x", measurements.RTMR2),
+			MrAggregated: measurements.CalculateMrAggregated(mrKeyProvider),
+			MrImage:      measurements.CalculateMrImage(),
 		}
 		jsonData, err := json.MarshalIndent(output, "", "  ")
 		if err != nil {
@@ -193,7 +203,7 @@ func main() {
 		fmt.Printf("RTMR0: %x\n", measurements.RTMR0)
 		fmt.Printf("RTMR1: %x\n", measurements.RTMR1)
 		fmt.Printf("RTMR2: %x\n", measurements.RTMR2)
-		fmt.Printf("mr_enclave: %s\n", measurements.CalculateMrEnclave(mrKeyProvider))
-		fmt.Printf("mr_image: %s\n", measurements.CalculateMrImage())
+		fmt.Printf("MR_AGGREGATED: %s\n", measurements.CalculateMrAggregated(mrKeyProvider))
+		fmt.Printf("MR_IMAGE: %s\n", measurements.CalculateMrImage())
 	}
 }
