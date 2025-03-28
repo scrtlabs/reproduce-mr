@@ -111,13 +111,18 @@ func measureTdxQemuTdHob(memorySize uint64, meta *tdvfMetadata) []byte {
 }
 
 // measureLog computes a measurement of the given RTMR event log by simulating extending the RTMR.
-func measureLog(log [][]byte) []byte {
+func measureLog(RTMR int, log [][]byte) []byte {
 	var mr [48]byte // Initialize to zero.
-	for _, entry := range log {
+	for i, entry := range log {
+
+		fmt.Printf("RTMR%d [ %d] [Emul. ] %x\n",RTMR, i+1, entry)
+
 		h := sha512.New384()
 		_, _ = h.Write(mr[:])
 		_, _ = h.Write(entry)
 		copy(mr[:], h.Sum([]byte{}))
+		
+		//fmt.Printf("Measurement after entry %d: %x\n", i, mr)
 	}
 	return mr[:]
 }
@@ -552,6 +557,12 @@ func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memoryS
 		return nil, err
 	}
 
+	//hobhash for TSB_SVB 6
+	//tdHobHash, err := hex.DecodeString("6de3065bc65fbb7c276ce585eb0bcad5e8bd57065d3a0db4c376f7c8960066759ea388f52a95f4a653469cf353b2fef1")
+	
+	//hobhash for TSB_SVB 7
+	//tdHobHash, err := hex.DecodeString("cd2312a0d87ef3c4a928df87088969a80b33d7bf3fc584bdde637b09ed808a8d821a56b78a13a6eb506db7578444abbe")
+	
 	rtmr0Log := append([][]byte{},
 		tdHobHash,
 		cfvImageHash,
@@ -560,14 +571,15 @@ func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memoryS
 		measureTdxEfiVariable("8BE4DF61-93CA-11D2-AA0D-00E098032B8C", "KEK"),
 		measureTdxEfiVariable("D719B2CB-3D3A-4596-A3BC-DAD00E67656F", "db"),
 		measureTdxEfiVariable("D719B2CB-3D3A-4596-A3BC-DAD00E67656F", "dbx"),
-		measureSha384([]byte{0x00, 0x00, 0x00, 0x00}), // Separator.
+		measureSha384([]byte{0x00, 0x00, 0x00, 0x00}), // Separator
 		acpiLoaderHash,
 		acpiRsdpHash,
 		acpiTablesHash,
 		measureSha384([]byte{0x00, 0x00}), // BootOrder
 		boot000Hash,                       // Boot000
+//		measureSha384([]byte{0x00, 0x00, 0x00, 0x00}), // Separator, only present in TCB_SVN 6
 	)
-	measurements.RTMR0 = measureLog(rtmr0Log)
+	measurements.RTMR0 = measureLog(0, rtmr0Log)
 
 	// RTMR1 calculation
 	var err2 error
@@ -576,20 +588,20 @@ func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memoryS
 		return nil, err2
 	}
 	rtmr1Log := append([][]byte{},
-		kernelAuthHash,
+		kernelAuthHash, 
 		measureSha384([]byte("Calling EFI Application from Boot Option")),
-		measureSha384([]byte{0x00, 0x00, 0x00, 0x00}), // Separator.
+		measureSha384([]byte{0x00, 0x00, 0x00, 0x00}), // Separator. 
 		measureSha384([]byte("Exit Boot Services Invocation")),
 		measureSha384([]byte("Exit Boot Services Returned with Success")),
 	)
-	measurements.RTMR1 = measureLog(rtmr1Log)
+	measurements.RTMR1 = measureLog(1, rtmr1Log)
 
 	// RTMR2 calculation
 	rtmr2Log := append([][]byte{},
 		measureTdxKernelCmdline(kernelCmdline),
 		measureSha384(initrdData),
 	)
-	measurements.RTMR2 = measureLog(rtmr2Log)
+	measurements.RTMR2 = measureLog(2, rtmr2Log)
 
 	return measurements, nil
 }
