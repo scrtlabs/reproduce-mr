@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/foxboron/go-uefi/authenticode"
@@ -114,23 +115,35 @@ func measureTdxQemuTdHob(memorySize uint64, meta *tdvfMetadata) []byte {
 func measureLog(RTMR int, log [][]byte) []byte {
 	var mr [48]byte // Initialize to zero.
 	for i, entry := range log {
-
-		fmt.Printf("RTMR%d [ %d] [Emul. ] %x\n",RTMR, i+1, entry)
-
+		fmt.Printf("RTMR#%d [ %d] [Emul. ] %x\n", RTMR, i+1, entry)
 		h := sha512.New384()
 		_, _ = h.Write(mr[:])
 		_, _ = h.Write(entry)
 		copy(mr[:], h.Sum([]byte{}))
-		
-		//fmt.Printf("Measurement after entry %d: %x\n", i, mr)
 	}
 	return mr[:]
+
 }
 
 // measureTdxQemuAcpiTables measures QEMU-generated ACPI tables for TDX.
 func measureTdxQemuAcpiTables(memorySize uint64, cpuCount uint8) ([]byte, []byte, []byte, error) {
 	// Generate ACPI tables
 	tables, rsdp, loader, err := GenerateTablesQemu(memorySize, cpuCount)
+	tables2, rsdp2, loader2, err2 := GenerateTablesQemu2(memorySize, cpuCount)
+
+	if err != nil || err2 != nil {
+		fmt.Printf("Errors: %v, %v\n", err, err2)
+
+	}
+
+	// Compare all three values concisely
+	tablesMatch := reflect.DeepEqual(tables, tables2)
+	rsdpMatch := bytes.Equal(rsdp, rsdp2)
+	loaderMatch := bytes.Equal(loader, loader2)
+
+	fmt.Printf("Comparison: tables=%v, rsdp=%v, loader=%v\n",
+		tablesMatch, rsdpMatch, loaderMatch)
+
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate ACPI tables: %w", err)
 	}
@@ -536,7 +549,82 @@ func (m *TdxMeasurements) CalculateMrImage() string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+func mustDecodeHex(s string) []byte {
+	decoded, err := hex.DecodeString(s)
+	if err != nil {
+		panic(err)
+	}
+	return decoded
+}
+
+const INIT_MR = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+
+func replayRTMR(history []string) (string, error) {
+	if len(history) == 0 {
+		return INIT_MR, nil
+	}
+
+	mr := make([]byte, 48)
+
+	for _, content := range history {
+		contentBytes, err := hex.DecodeString(content)
+		if err != nil {
+			return "", err
+		}
+
+		if len(contentBytes) < 48 {
+			padding := make([]byte, 48-len(contentBytes))
+			contentBytes = append(contentBytes, padding...)
+		}
+
+		h := sha512.New384()
+		h.Write(append(mr, contentBytes...))
+		mr = h.Sum(nil)
+		fmt.Printf("%x\n", mr)
+
+	}
+
+	return hex.EncodeToString(mr), nil
+}
+
+func eventDigest(ty uint32, event string, payload []byte) [48]byte {
+	hasher := sha512.New384()
+
+	// Convert ty to bytes in native endianness
+	tyBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(tyBytes, ty)
+
+	hasher.Write(tyBytes)
+	hasher.Write([]byte(":"))
+	hasher.Write([]byte(event))
+	hasher.Write([]byte(":"))
+	hasher.Write(payload)
+
+	// Get the final hash
+	var digest [48]byte
+	copy(digest[:], hasher.Sum(nil))
+
+	return digest
+}
+
 func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memorySize uint64, cpuCount uint8, kernelCmdline string) (*TdxMeasurements, error) {
+
+	//evtDigestAppId := eventDigest(134217729, "app-id", mustDecodeHex("7d778c40c66c5bb8b3c626f05b6a7c73aaf691ed"))
+	//fmt.Println(hex.EncodeToString(evtDigestAppId[:]))
+	//evtDigestComposeHash := eventDigest(134217729, "compose-hash", mustDecodeHex("7d778c40c66c5bb8b3c626f05b6a7c73aaf691ed68e3b90310dcdbc519d22d67"))
+	//fmt.Println(hex.EncodeToString(evtDigestComposeHash[:]))
+	//os.Exit(0)
+	//fmt.Print(hex.EncodeToString(measureSha384([]byte("7d778c40c66c5bb8b3c626f05b6a7c73aaf691ed"))))
+
+	tempLog := make([]string, 0)
+	tempLog = append(tempLog, "738ae348dbf674b3399300c0b9416c203e9b645c6ffee233035d09003cccad12f71becc805ad8d97575bc790c6819216")
+	tempLog = append(tempLog, "ac485e056fa2b0119d3f8340928bf063d5a04b91426c50391f75b28aeeadade02d1f2af57d59c8551e9aab14bbdb1a3b")
+	tempLog = append(tempLog, "aa6bd57630ab3b748fb6a9411b0f7b707617e664df1965eb51849ccf3447547ede5c10c871edebf6bcea376fb4b099ec")
+	tempLog = append(tempLog, "5b6a576d1da40f04179ad469e00f90a1c0044bc9e8472d0da2776acb108dc98a73560d42cea6b8b763eb4a0e6d4d82d5")
+	tempLog = append(tempLog, "d9391c933cce6ca8bd254c41e109df96f47d88574e022f695e85e516fe40417598afd6684663785c28643fa304a6cbad")
+
+	//replayRTMR(tempLog)
+
 	// Parse TDVF metadata.
 	tdvfMeta, err := parseTdvfMetadata(fwData)
 	if err != nil {
@@ -549,7 +637,7 @@ func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memoryS
 	measurements.MRTD = tdvfMeta.computeMrtd(fwData, mrtdVariantTwoPass)
 
 	// RTMR0 calculation (existing code)
-	tdHobHash := measureTdxQemuTdHob(memorySize, tdvfMeta)
+	//tdHobHash := measureTdxQemuTdHob(memorySize, tdvfMeta)
 	cfvImageHash, _ := hex.DecodeString("344BC51C980BA621AAA00DA3ED7436F7D6E549197DFE699515DFA2C6583D95E6412AF21C097D473155875FFD561D6790")
 	boot000Hash, _ := hex.DecodeString("23ADA07F5261F12F34A0BD8E46760962D6B4D576A416F1FEA1C64BC656B1D28EACF7047AE6E967C58FD2A98BFA74C298")
 	acpiTablesHash, acpiRsdpHash, acpiLoaderHash, err := measureTdxQemuAcpiTables(memorySize, cpuCount)
@@ -559,10 +647,10 @@ func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memoryS
 
 	//hobhash for TSB_SVB 6
 	//tdHobHash, err := hex.DecodeString("6de3065bc65fbb7c276ce585eb0bcad5e8bd57065d3a0db4c376f7c8960066759ea388f52a95f4a653469cf353b2fef1")
-	
+
 	//hobhash for TSB_SVB 7
-	//tdHobHash, err := hex.DecodeString("cd2312a0d87ef3c4a928df87088969a80b33d7bf3fc584bdde637b09ed808a8d821a56b78a13a6eb506db7578444abbe")
-	
+	tdHobHash, err := hex.DecodeString("cd2312a0d87ef3c4a928df87088969a80b33d7bf3fc584bdde637b09ed808a8d821a56b78a13a6eb506db7578444abbe")
+
 	rtmr0Log := append([][]byte{},
 		tdHobHash,
 		cfvImageHash,
@@ -577,7 +665,7 @@ func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memoryS
 		acpiTablesHash,
 		measureSha384([]byte{0x00, 0x00}), // BootOrder
 		boot000Hash,                       // Boot000
-//		measureSha384([]byte{0x00, 0x00, 0x00, 0x00}), // Separator, only present in TCB_SVN 6
+		//		measureSha384([]byte{0x00, 0x00, 0x00, 0x00}), // Separator, only present in TCB_SVN 6
 	)
 	measurements.RTMR0 = measureLog(0, rtmr0Log)
 
@@ -588,9 +676,9 @@ func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memoryS
 		return nil, err2
 	}
 	rtmr1Log := append([][]byte{},
-		kernelAuthHash, 
+		kernelAuthHash,
 		measureSha384([]byte("Calling EFI Application from Boot Option")),
-		measureSha384([]byte{0x00, 0x00, 0x00, 0x00}), // Separator. 
+		measureSha384([]byte{0x00, 0x00, 0x00, 0x00}), // Separator.
 		measureSha384([]byte("Exit Boot Services Invocation")),
 		measureSha384([]byte("Exit Boot Services Returned with Success")),
 	)
