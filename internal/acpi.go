@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 )
 
 //go:embed *.json.gz
@@ -21,16 +22,14 @@ func GenerateTablesQemu2(memorySize uint64, cpuCount uint8) ([]byte, []byte, []b
 	// Fetch template based on CPU count.
 	fn := fmt.Sprintf("template_qemu_cpu%d.hex", cpuCount)
 
-	fmt.Println(fn)
-
 	tplHex, err := templateFiles.ReadFile(fn)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("template for ACPI tables is not available: %w", err)
 	}
 
-	tpl, err := hex.DecodeString(string(tplHex))
+	tpl, err := hex.DecodeString(strings.ReplaceAll(string(tplHex), "\n", ""))
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("malformed ACPI table template")
+		return nil, nil, nil, fmt.Errorf("malformed ACPI table template %s", err)
 	}
 
 	// Generate RSDP.
@@ -43,49 +42,44 @@ func GenerateTablesQemu2(memorySize uint64, cpuCount uint8) ([]byte, []byte, []b
 
 	// Find all required ACPI tables.
 	dsdtOffset, dsdtCsum, dsdtLen, err := findAcpiTable(tpl, "DSDT")
-	fmt.Println("got DSDT")
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	facpOffset, facpCsum, facpLen, err := findAcpiTable(tpl, "FACP")
-	fmt.Println("got FACP")
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	apicOffset, apicCsum, apicLen, err := findAcpiTable(tpl, "APIC")
-	fmt.Println("got APIC")
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	mcfgOffset, mcfgCsum, mcfgLen, err := findAcpiTable(tpl, "MCFG")
 	if err != nil {
-		fmt.Println("error in  MCFG")
 		return nil, nil, nil, err
 	}
-	fmt.Println("got MCFG")
-	//	waetOffset, waetCsum, waetLen, err := findAcpiTable(tpl, "WAET")
-	fmt.Println("got WAET")
-	//if err != nil {
-	//		return nil, nil, nil, err
-	//	}
+	waetOffset, waetCsum, waetLen, err := findAcpiTable(tpl, "WAET")
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	rsdtOffset, rsdtCsum, rsdtLen, err := findAcpiTable(tpl, "RSDT")
-	fmt.Println("got RSDT")
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
 	// Handle memory split at 2816 MiB (0xB0000000).
-	lengthOffset := dsdtLen - 684           // Offset of the length field inside the DSDT table.
-	rangeMinimumOffset := lengthOffset - 12 // Offset of the range minimum field inside the DSDT table.
+	/*
+		   lengthOffset := dsdtLen - 684           // Offset of the length field inside the DSDT table.
+		   rangeMinimumOffset := lengthOffset - 12 // Offset of the range minimum field inside the DSDT table.
 
-	if memorySize >= 2816 {
-		binary.LittleEndian.PutUint32(tpl[rangeMinimumOffset:], 0x80000000)
-		binary.LittleEndian.PutUint32(tpl[lengthOffset:], 0x60000000)
-	} else {
-		memSizeBytes := uint32(memorySize * 1024 * 1024) //nolint: gosec
-		binary.LittleEndian.PutUint32(tpl[rangeMinimumOffset:], memSizeBytes)
-		binary.LittleEndian.PutUint32(tpl[lengthOffset:], 0xe0000000-memSizeBytes)
-	}
+			if memorySize >= 2816 {
+				binary.LittleEndian.PutUint32(tpl[rangeMinimumOffset:], 0x80000000)
+				binary.LittleEndian.PutUint32(tpl[lengthOffset:], 0x60000000)
+			} else {
+				memSizeBytes := uint32(memorySize * 1024 * 1024) //nolint: gosec
+				binary.LittleEndian.PutUint32(tpl[rangeMinimumOffset:], memSizeBytes)
+				binary.LittleEndian.PutUint32(tpl[lengthOffset:], 0xe0000000-memSizeBytes)
+			}
+	*/
 
 	// Update RSDP with RSDT address.
 	var rsdtAddress [4]byte
@@ -104,7 +98,7 @@ func GenerateTablesQemu2(memorySize uint64, cpuCount uint8) ([]byte, []byte, []b
 	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddChecksum{"etc/acpi/tables", facpCsum, facpOffset, facpLen}) // FACP
 	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddChecksum{"etc/acpi/tables", apicCsum, apicOffset, apicLen}) // APIC
 	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddChecksum{"etc/acpi/tables", mcfgCsum, mcfgOffset, mcfgLen}) // MCFG
-	//ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddChecksum{"etc/acpi/tables", waetCsum, waetOffset, waetLen}) // WAET
+	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddChecksum{"etc/acpi/tables", waetCsum, waetOffset, waetLen}) // WAET
 	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddPtr{"etc/acpi/tables", "etc/acpi/tables", rsdtOffset + 36, 4})
 	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddPtr{"etc/acpi/tables", "etc/acpi/tables", rsdtOffset + 40, 4})
 	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddPtr{"etc/acpi/tables", "etc/acpi/tables", rsdtOffset + 44, 4})
@@ -154,7 +148,6 @@ func GenerateTablesQemu(memorySize uint64, cpuCount uint8) ([]byte, []byte, []by
 
 	tpl, err := hex.DecodeString(tplHex)
 	if err != nil {
-		fmt.Printf("ACPI table template: %s\n", tplHex)
 		return nil, nil, nil, fmt.Errorf("malformed ACPI table template, %w", err)
 	}
 
@@ -211,8 +204,6 @@ func GenerateTablesQemu(memorySize uint64, cpuCount uint8) ([]byte, []byte, []by
 	binary.LittleEndian.PutUint32(rsdtAddress[:], rsdtOffset)
 	rsdp = append(rsdp, rsdtAddress[:]...)
 
-	fmt.Printf("RSDP: %s\n", rsdp)
-
 	// Generate table loader commands.
 	const ldrLength = 4096
 	ldr := qemuLoaderAppend(nil, &qemuLoaderCmdAllocate{"etc/acpi/rsdp", 16, 2})
@@ -242,8 +233,6 @@ func GenerateTablesQemu(memorySize uint64, cpuCount uint8) ([]byte, []byte, []by
 // findAcpiTable searches for the ACPI table with the given signature and returns its offset,
 // checksum offset and length.
 func findAcpiTable(tables []byte, signature string) (uint32, uint32, uint32, error) {
-
-	fmt.Printf("in findAcpiTable %s \n", signature)
 	if len(tables) < 12 {
 		return 0, 0, 0, fmt.Errorf("ACPI table is too short")
 	}
@@ -255,7 +244,6 @@ func findAcpiTable(tables []byte, signature string) (uint32, uint32, uint32, err
 		}
 
 		tblSig := string(tables[offset : offset+4])
-		fmt.Printf("tblSig: %s\n", tblSig)
 		tblLen := int(binary.LittleEndian.Uint32(tables[offset+4 : offset+8]))
 		if tblSig == signature {
 			return uint32(offset), uint32(offset + 9), uint32(tblLen), nil

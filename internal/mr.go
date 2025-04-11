@@ -648,7 +648,9 @@ func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memoryS
 	//tdHobHash, err := hex.DecodeString("6de3065bc65fbb7c276ce585eb0bcad5e8bd57065d3a0db4c376f7c8960066759ea388f52a95f4a653469cf353b2fef1")
 
 	//hobhash for TSB_SVN 7
-	tdHobHash, err := hex.DecodeString("cd2312a0d87ef3c4a928df87088969a80b33d7bf3fc584bdde637b09ed808a8d821a56b78a13a6eb506db7578444abbe")
+	//tdHobHash, err := hex.DecodeString("cd2312a0d87ef3c4a928df87088969a80b33d7bf3fc584bdde637b09ed808a8d821a56b78a13a6eb506db7578444abbe")
+
+	tdHobHash, err := hex.DecodeString("0b8772e5b0b41b83e6044a68397e02f49fb47066b4fbe4917ea2c45c64f323fdacbb37948f821ebaf8bc9c938ba8a749")
 
 	rtmr0Log := append([][]byte{},
 		tdHobHash,
