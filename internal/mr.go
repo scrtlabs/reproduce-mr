@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"reflect"
 	"strings"
 
 	"github.com/foxboron/go-uefi/authenticode"
@@ -128,21 +127,20 @@ func measureLog(RTMR int, log [][]byte) []byte {
 // measureTdxQemuAcpiTables measures QEMU-generated ACPI tables for TDX.
 func measureTdxQemuAcpiTables(memorySize uint64, cpuCount uint8) ([]byte, []byte, []byte, error) {
 	// Generate ACPI tables
-	tables, rsdp, loader, err := GenerateTablesQemu(memorySize, cpuCount)
-	tables2, rsdp2, loader2, err2 := GenerateTablesQemu2(memorySize, cpuCount)
+	//tables, rsdp, loader, err := GenerateTablesQemu(memorySize, cpuCount)
+	tables, rsdp, loader, err := GenerateTablesQemu2(memorySize, cpuCount)
 
-	if err != nil || err2 != nil {
-		fmt.Printf("Errors: %v, %v\n", err, err2)
-
-	}
+	//if err != nil || err2 != nil {
+	//	fmt.Printf("Errors: %v, %v\n", err, err2)
+	//	}
 
 	// Compare all three values concisely
-	tablesMatch := reflect.DeepEqual(tables, tables2)
-	rsdpMatch := bytes.Equal(rsdp, rsdp2)
-	loaderMatch := bytes.Equal(loader, loader2)
+	//tablesMatch := reflect.DeepEqual(tables, tables2)
+	//rsdpMatch := bytes.Equal(rsdp, rsdp2)
+	//loaderMatch := bytes.Equal(loader, loader2)
 
-	fmt.Printf("Comparison: tables=%v, rsdp=%v, loader=%v\n",
-		tablesMatch, rsdpMatch, loaderMatch)
+	//fmt.Printf("Comparison: tables=%v, rsdp=%v, loader=%v\n",
+	//	tablesMatch, rsdpMatch, loaderMatch)
 
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate ACPI tables: %w", err)
@@ -634,6 +632,7 @@ func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memoryS
 	measurements := &TdxMeasurements{}
 
 	// Calculate MRTD
+	// use mrtdVariantTwoPass for TCB_SVN 6xx, and mrtdVariantSinglePass for 7xx
 	measurements.MRTD = tdvfMeta.computeMrtd(fwData, mrtdVariantTwoPass)
 
 	// RTMR0 calculation (existing code)
@@ -645,10 +644,10 @@ func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memoryS
 		return nil, err
 	}
 
-	//hobhash for TSB_SVB 6
+	//hobhash for TSB_SVN 6
 	//tdHobHash, err := hex.DecodeString("6de3065bc65fbb7c276ce585eb0bcad5e8bd57065d3a0db4c376f7c8960066759ea388f52a95f4a653469cf353b2fef1")
 
-	//hobhash for TSB_SVB 7
+	//hobhash for TSB_SVN 7
 	tdHobHash, err := hex.DecodeString("cd2312a0d87ef3c4a928df87088969a80b33d7bf3fc584bdde637b09ed808a8d821a56b78a13a6eb506db7578444abbe")
 
 	rtmr0Log := append([][]byte{},
