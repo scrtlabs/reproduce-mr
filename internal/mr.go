@@ -90,8 +90,8 @@ func measureTdxQemuTdHob(memorySize uint64, meta *tdvfMetadata) []byte {
 	addMemoryResourceHob(0x07, 0x0000000000806000, 0x0000000000003000)
 	addMemoryResourceHob(0x00, 0x0000000000809000, 0x0000000000002000)
 	addMemoryResourceHob(0x00, 0x000000000080B000, 0x0000000000002000)
-	addMemoryResourceHob(0x07, 0x000000000080D000, 0x0000000000004000)
-	addMemoryResourceHob(0x00, 0x0000000000811000, 0x000000000000f000)
+	addMemoryResourceHob(0x07, 0x000000000080D000, 0x0000000000003000) // 4000 -> 3000
+	addMemoryResourceHob(0x00, 0x0000000000810000, 0x0000000000010000) // 8101 -> 8100; 0000f -> 10000
 
 	// Handle memory split at 2816 MiB (0xB0000000).
 	if memorySize >= 2816 {
@@ -633,24 +633,16 @@ func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memoryS
 
 	// Calculate MRTD
 	// use mrtdVariantTwoPass for TCB_SVN 6xx, and mrtdVariantSinglePass for 7xx
-	measurements.MRTD = tdvfMeta.computeMrtd(fwData, mrtdVariantTwoPass)
+	measurements.MRTD = tdvfMeta.computeMrtd(fwData, mrtdVariantSinglePass)
 
 	// RTMR0 calculation (existing code)
-	//tdHobHash := measureTdxQemuTdHob(memorySize, tdvfMeta)
+	tdHobHash := measureTdxQemuTdHob(memorySize, tdvfMeta)
 	cfvImageHash, _ := hex.DecodeString("344BC51C980BA621AAA00DA3ED7436F7D6E549197DFE699515DFA2C6583D95E6412AF21C097D473155875FFD561D6790")
 	boot000Hash, _ := hex.DecodeString("23ADA07F5261F12F34A0BD8E46760962D6B4D576A416F1FEA1C64BC656B1D28EACF7047AE6E967C58FD2A98BFA74C298")
 	acpiTablesHash, acpiRsdpHash, acpiLoaderHash, err := measureTdxQemuAcpiTables(memorySize, cpuCount)
 	if err != nil {
 		return nil, err
 	}
-
-	//hobhash for TSB_SVN 6
-	//tdHobHash, err := hex.DecodeString("6de3065bc65fbb7c276ce585eb0bcad5e8bd57065d3a0db4c376f7c8960066759ea388f52a95f4a653469cf353b2fef1")
-
-	//hobhash for TSB_SVN 7
-	//tdHobHash, err := hex.DecodeString("cd2312a0d87ef3c4a928df87088969a80b33d7bf3fc584bdde637b09ed808a8d821a56b78a13a6eb506db7578444abbe")
-
-	tdHobHash, err := hex.DecodeString("0b8772e5b0b41b83e6044a68397e02f49fb47066b4fbe4917ea2c45c64f323fdacbb37948f821ebaf8bc9c938ba8a749")
 
 	rtmr0Log := append([][]byte{},
 		tdHobHash,
