@@ -7,7 +7,7 @@ This project is based on [oasis-cli](https://github.com/oasisprotocol/cli) and m
 ## Installation
 
 ```bash
-go install github.com/kvinwang/dstack-mr@latest
+go install github.com/scrtlabs/dstack-mr@latest
 ```
 
 ## Usage
