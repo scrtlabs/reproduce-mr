@@ -90,8 +90,8 @@ func measureTdxQemuTdHob(memorySize uint64, meta *tdvfMetadata) []byte {
 	addMemoryResourceHob(0x07, 0x0000000000806000, 0x0000000000003000)
 	addMemoryResourceHob(0x00, 0x0000000000809000, 0x0000000000002000)
 	addMemoryResourceHob(0x00, 0x000000000080B000, 0x0000000000002000)
-	addMemoryResourceHob(0x07, 0x000000000080D000, 0x0000000000003000) // 4000 -> 3000
-	addMemoryResourceHob(0x00, 0x0000000000810000, 0x0000000000010000) // 8101 -> 8100; 0000f -> 10000
+	addMemoryResourceHob(0x07, 0x000000000080D000, 0x0000000000004000)
+	addMemoryResourceHob(0x00, 0x0000000000811000, 0x000000000000f000) // 8101 -> 8100; 0000f -> 10000
 
 	// Handle memory split at 2816 MiB (0xB0000000).
 	if memorySize >= 2816 {
