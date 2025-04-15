@@ -24,6 +24,7 @@ type measurementOutput struct {
 	RTMR0        string `json:"rtmr0"`
 	RTMR1        string `json:"rtmr1"`
 	RTMR2        string `json:"rtmr2"`
+	RTMR3        string `json:"rtmr3"`
 	MrAggregated string `json:"mr_aggregated"`
 	MrImage      string `json:"mr_image"`
 }
@@ -88,20 +89,26 @@ func (m *memoryValue) Set(value string) error {
 func main() {
 	const defaultMrKeyProvider = "0x0000000000000000000000000000000000000000000000000000000000000000"
 	var (
-		fwPath        string
-		kernelPath    string
-		initrdPath    string
-		memorySize    memoryValue = 2048 // 2G default (in MB)
-		cpuCountUint  uint
-		kernelCmdline string
-		jsonOutput    bool
-		metadataPath  string
-		mrKeyProvider string = defaultMrKeyProvider
+		fwPath            string
+		kernelPath        string
+		initrdPath        string
+		rootfsPath        string
+		dockerComposePath string
+		dockerFilesPath   string
+		memorySize        memoryValue = 2048 // 2G default (in MB)
+		cpuCountUint      uint
+		kernelCmdline     string
+		jsonOutput        bool
+		metadataPath      string
+		mrKeyProvider     string = defaultMrKeyProvider
 	)
 
 	flag.StringVar(&fwPath, "fw", "", "Path to firmware file")
 	flag.StringVar(&kernelPath, "kernel", "", "Path to kernel file")
 	flag.StringVar(&initrdPath, "initrd", "", "Path to initrd file")
+	flag.StringVar(&rootfsPath, "rootfs", "", "Path to rootfs file")
+	flag.StringVar(&dockerComposePath, "dockercompose", "", "Path to docker compose file")
+	flag.StringVar(&dockerFilesPath, "dockerfiles", "", "Path to docker files file")
 	flag.Var(&memorySize, "memory", "Memory size (e.g., 512M, 1G, 2G)")
 	flag.UintVar(&cpuCountUint, "cpu", 1, "Number of CPUs")
 	flag.StringVar(&kernelCmdline, "cmdline", "", "Kernel command line")
@@ -176,8 +183,34 @@ func main() {
 		}
 	}
 
+	var rootfsData []byte
+	if rootfsPath != "" {
+		rootfsData, err = os.ReadFile(rootfsPath)
+		if err != nil {
+			fmt.Printf("Error reading rootfs file: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	var dockerComposeData []byte
+	if dockerComposePath != "" {
+		dockerComposeData, err = os.ReadFile(dockerComposePath)
+		if err != nil {
+			fmt.Printf("Error reading docker compose file: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	var dockerFilesData []byte
+	if dockerFilesPath != "" {
+		dockerFilesData, err = os.ReadFile(dockerFilesPath)
+		if err != nil {
+			fmt.Printf("Error reading docker files file: %v\n", err)
+			os.Exit(1)
+		}
+	}
 	// Calculate measurements
-	measurements, err := internal.MeasureTdxQemu(fwData, kernelData, initrdData, uint64(memorySize), uint8(cpuCountUint), kernelCmdline)
+	measurements, err := internal.MeasureTdxQemu(fwData, kernelData, initrdData, rootfsData, dockerComposeData, dockerFilesData, uint64(memorySize), uint8(cpuCountUint), kernelCmdline)
 	if err != nil {
 		fmt.Printf("Error calculating measurements: %v\n", err)
 		os.Exit(1)
@@ -189,6 +222,7 @@ func main() {
 			RTMR0:        fmt.Sprintf("%x", measurements.RTMR0),
 			RTMR1:        fmt.Sprintf("%x", measurements.RTMR1),
 			RTMR2:        fmt.Sprintf("%x", measurements.RTMR2),
+			RTMR3:        fmt.Sprintf("%x", measurements.RTMR3),
 			MrAggregated: measurements.CalculateMrAggregated(mrKeyProvider),
 			MrImage:      measurements.CalculateMrImage(),
 		}
@@ -203,6 +237,7 @@ func main() {
 		fmt.Printf("RTMR0: %x\n", measurements.RTMR0)
 		fmt.Printf("RTMR1: %x\n", measurements.RTMR1)
 		fmt.Printf("RTMR2: %x\n", measurements.RTMR2)
+		fmt.Printf("RTMR3: %x\n", measurements.RTMR3)
 		fmt.Printf("MR_AGGREGATED: %s\n", measurements.CalculateMrAggregated(mrKeyProvider))
 		fmt.Printf("MR_IMAGE: %s\n", measurements.CalculateMrImage())
 	}

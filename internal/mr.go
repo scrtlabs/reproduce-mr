@@ -16,6 +16,12 @@ import (
 	"golang.org/x/text/transform"
 )
 
+// measureSha256 computes a SHA256 of the given blob.
+func measureSha256(data []byte) []byte {
+	h := sha256.Sum256(data)
+	return h[:]
+}
+
 // measureSha384 computes a SHA384 of the given blob.
 func measureSha384(data []byte) []byte {
 	h := sha512.Sum384(data)
@@ -519,6 +525,7 @@ type TdxMeasurements struct {
 	RTMR0 []byte
 	RTMR1 []byte
 	RTMR2 []byte
+	RTMR3 []byte
 }
 
 // CalculateMrAggregated calculates mr_aggregated = sha256(mrtd+rtmr0+rtmr1+rtmr2+mr_key_provider)
@@ -534,6 +541,7 @@ func (m *TdxMeasurements) CalculateMrAggregated(mrKeyProvider string) string {
 	h.Write(m.RTMR0)
 	h.Write(m.RTMR1)
 	h.Write(m.RTMR2)
+	h.Write(m.RTMR3)
 	h.Write(mrKeyProviderBytes)
 	return hex.EncodeToString(h.Sum(nil))
 }
@@ -544,6 +552,7 @@ func (m *TdxMeasurements) CalculateMrImage() string {
 	h.Write(m.MRTD)
 	h.Write(m.RTMR1)
 	h.Write(m.RTMR2)
+	h.Write(m.RTMR3)
 	return hex.EncodeToString(h.Sum(nil))
 }
 
@@ -579,7 +588,6 @@ func replayRTMR(history []string) (string, error) {
 		h.Write(append(mr, contentBytes...))
 		mr = h.Sum(nil)
 		fmt.Printf("%x\n", mr)
-
 	}
 
 	return hex.EncodeToString(mr), nil
@@ -605,7 +613,7 @@ func eventDigest(ty uint32, event string, payload []byte) [48]byte {
 	return digest
 }
 
-func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memorySize uint64, cpuCount uint8, kernelCmdline string) (*TdxMeasurements, error) {
+func MeasureTdxQemu(fwData, kernelData, initrdData, rootfsData, dockerCompose, dockerFiles []byte, memorySize uint64, cpuCount uint8, kernelCmdline string) (*TdxMeasurements, error) {
 
 	//evtDigestAppId := eventDigest(134217729, "app-id", mustDecodeHex("7d778c40c66c5bb8b3c626f05b6a7c73aaf691ed"))
 	//fmt.Println(hex.EncodeToString(evtDigestAppId[:]))
@@ -683,6 +691,23 @@ func MeasureTdxQemu(fwData []byte, kernelData []byte, initrdData []byte, memoryS
 		measureSha384(initrdData),
 	)
 	measurements.RTMR2 = measureLog(2, rtmr2Log)
+
+	// RTMR3 calculation
+	log := make([]string, 0)
+	log = append(log, hex.EncodeToString(measureSha256(dockerCompose)))
+	log = append(log, hex.EncodeToString(measureSha256(rootfsData)))
+	if len(dockerFiles) > 0 {
+		log = append(log, hex.EncodeToString(measureSha256(dockerFiles)))
+	}
+	logHashStr, err := replayRTMR(log)
+	if err != nil {
+		return nil, err
+	}
+	logHash, err := hex.DecodeString(logHashStr)
+	if err != nil {
+		return nil, err
+	}
+	measurements.RTMR3 = logHash
 
 	return measurements, nil
 }
