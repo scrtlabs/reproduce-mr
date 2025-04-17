@@ -5,19 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/kvinwang/dstack-mr/internal"
 )
-
-type DStackMetadata struct {
-	Bios    string `json:"bios"`
-	Kernel  string `json:"kernel"`
-	Cmdline string `json:"cmdline"`
-	Initrd  string `json:"initrd"`
-}
 
 type measurementOutput struct {
 	MRTD         string `json:"mrtd"`
@@ -99,7 +91,6 @@ func main() {
 		cpuCountUint      uint
 		kernelCmdline     string
 		jsonOutput        bool
-		metadataPath      string
 		mrKeyProvider     string = defaultMrKeyProvider
 	)
 
@@ -113,7 +104,6 @@ func main() {
 	flag.UintVar(&cpuCountUint, "cpu", 1, "Number of CPUs")
 	flag.StringVar(&kernelCmdline, "cmdline", "", "Kernel command line")
 	flag.BoolVar(&jsonOutput, "json", false, "Output in JSON format")
-	flag.StringVar(&metadataPath, "metadata", "", "Path to DStack metadata.json file")
 	flag.StringVar(&mrKeyProvider, "mrkp", defaultMrKeyProvider, "Measurement of key provider")
 	flag.Parse()
 
@@ -122,41 +112,8 @@ func main() {
 		mrKeyProvider = knownKeyProvider
 	}
 
-	// If metadata file is provided, read it and override other options
-	if metadataPath != "" {
-		metadataDir := filepath.Dir(metadataPath)
-		data, err := os.ReadFile(metadataPath)
-		if err != nil {
-			fmt.Printf("Error reading metadata file: %v\n", err)
-			os.Exit(1)
-		}
-
-		var metadata DStackMetadata
-		if err := json.Unmarshal(data, &metadata); err != nil {
-			fmt.Printf("Error parsing metadata file: %v\n", err)
-			os.Exit(1)
-		}
-
-		// Override paths with metadata values
-		if fwPath == "" {
-			fwPath = filepath.Join(metadataDir, metadata.Bios)
-		}
-		if kernelPath == "" {
-			kernelPath = filepath.Join(metadataDir, metadata.Kernel)
-		}
-		if initrdPath == "" && metadata.Initrd != "" {
-			initrdPath = filepath.Join(metadataDir, metadata.Initrd)
-		}
-		if kernelCmdline == "" {
-			kernelCmdline = metadata.Cmdline
-			if metadata.Initrd != "" {
-				kernelCmdline += " initrd=initrd"
-			}
-		}
-	}
-
 	if fwPath == "" || kernelPath == "" {
-		fmt.Println("Error: firmware and kernel paths are required (either directly or via metadata.json)")
+		fmt.Println("Error: firmware and kernel paths are required")
 		flag.Usage()
 		os.Exit(1)
 	}
