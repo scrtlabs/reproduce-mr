@@ -97,7 +97,7 @@ func measureTdxQemuTdHob(memorySize uint64, meta *tdvfMetadata) []byte {
 	addMemoryResourceHob(0x00, 0x0000000000809000, 0x0000000000002000)
 	addMemoryResourceHob(0x00, 0x000000000080B000, 0x0000000000002000)
 	addMemoryResourceHob(0x07, 0x000000000080D000, 0x0000000000004000)
-	addMemoryResourceHob(0x00, 0x0000000000811000, 0x000000000000f000) // 8101 -> 8100; 0000f -> 10000
+	addMemoryResourceHob(0x00, 0x0000000000811000, 0x000000000000f000)
 
 	// Handle memory split at 2816 MiB (0xB0000000).
 	if memorySize >= 2816 {
@@ -133,20 +133,7 @@ func measureLog(RTMR int, log [][]byte) []byte {
 // measureTdxQemuAcpiTables measures QEMU-generated ACPI tables for TDX.
 func measureTdxQemuAcpiTables(memorySize uint64, cpuCount uint8) ([]byte, []byte, []byte, error) {
 	// Generate ACPI tables
-	//tables, rsdp, loader, err := GenerateTablesQemu(memorySize, cpuCount)
-	tables, rsdp, loader, err := GenerateTablesQemu2(memorySize, cpuCount)
-
-	//if err != nil || err2 != nil {
-	//	fmt.Printf("Errors: %v, %v\n", err, err2)
-	//	}
-
-	// Compare all three values concisely
-	//tablesMatch := reflect.DeepEqual(tables, tables2)
-	//rsdpMatch := bytes.Equal(rsdp, rsdp2)
-	//loaderMatch := bytes.Equal(loader, loader2)
-
-	//fmt.Printf("Comparison: tables=%v, rsdp=%v, loader=%v\n",
-	//	tablesMatch, rsdpMatch, loaderMatch)
+	tables, rsdp, loader, err := GenerateTablesQemu(memorySize, cpuCount)
 
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to generate ACPI tables: %w", err)
@@ -556,14 +543,6 @@ func (m *TdxMeasurements) CalculateMrImage() string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func mustDecodeHex(s string) []byte {
-	decoded, err := hex.DecodeString(s)
-	if err != nil {
-		panic(err)
-	}
-	return decoded
-}
-
 const INIT_MR = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 
 func replayRTMR(history []string) (string, error) {
@@ -587,50 +566,12 @@ func replayRTMR(history []string) (string, error) {
 		h := sha512.New384()
 		h.Write(append(mr, contentBytes...))
 		mr = h.Sum(nil)
-		fmt.Printf("%x\n", mr)
 	}
 
 	return hex.EncodeToString(mr), nil
 }
 
-func eventDigest(ty uint32, event string, payload []byte) [48]byte {
-	hasher := sha512.New384()
-
-	// Convert ty to bytes in native endianness
-	tyBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(tyBytes, ty)
-
-	hasher.Write(tyBytes)
-	hasher.Write([]byte(":"))
-	hasher.Write([]byte(event))
-	hasher.Write([]byte(":"))
-	hasher.Write(payload)
-
-	// Get the final hash
-	var digest [48]byte
-	copy(digest[:], hasher.Sum(nil))
-
-	return digest
-}
-
 func MeasureTdxQemu(fwData, kernelData, initrdData, rootfsData, dockerCompose, dockerFiles []byte, memorySize uint64, cpuCount uint8, kernelCmdline string) (*TdxMeasurements, error) {
-
-	//evtDigestAppId := eventDigest(134217729, "app-id", mustDecodeHex("7d778c40c66c5bb8b3c626f05b6a7c73aaf691ed"))
-	//fmt.Println(hex.EncodeToString(evtDigestAppId[:]))
-	//evtDigestComposeHash := eventDigest(134217729, "compose-hash", mustDecodeHex("7d778c40c66c5bb8b3c626f05b6a7c73aaf691ed68e3b90310dcdbc519d22d67"))
-	//fmt.Println(hex.EncodeToString(evtDigestComposeHash[:]))
-	//os.Exit(0)
-	//fmt.Print(hex.EncodeToString(measureSha384([]byte("7d778c40c66c5bb8b3c626f05b6a7c73aaf691ed"))))
-
-	tempLog := make([]string, 0)
-	tempLog = append(tempLog, "738ae348dbf674b3399300c0b9416c203e9b645c6ffee233035d09003cccad12f71becc805ad8d97575bc790c6819216")
-	tempLog = append(tempLog, "ac485e056fa2b0119d3f8340928bf063d5a04b91426c50391f75b28aeeadade02d1f2af57d59c8551e9aab14bbdb1a3b")
-	tempLog = append(tempLog, "aa6bd57630ab3b748fb6a9411b0f7b707617e664df1965eb51849ccf3447547ede5c10c871edebf6bcea376fb4b099ec")
-	tempLog = append(tempLog, "5b6a576d1da40f04179ad469e00f90a1c0044bc9e8472d0da2776acb108dc98a73560d42cea6b8b763eb4a0e6d4d82d5")
-	tempLog = append(tempLog, "d9391c933cce6ca8bd254c41e109df96f47d88574e022f695e85e516fe40417598afd6684663785c28643fa304a6cbad")
-
-	//replayRTMR(tempLog)
-
 	// Parse TDVF metadata.
 	tdvfMeta, err := parseTdvfMetadata(fwData)
 	if err != nil {

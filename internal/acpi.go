@@ -2,23 +2,17 @@ package internal
 
 import (
 	"bytes"
-	"compress/gzip"
 	"embed"
 	"encoding/binary"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 )
-
-//go:embed *.json.gz
-var templates embed.FS
 
 //go:embed template_qemu_cpu*.hex
 var templateFiles embed.FS
 
-func GenerateTablesQemu2(memorySize uint64, cpuCount uint8) ([]byte, []byte, []byte, error) {
+func GenerateTablesQemu(memorySize uint64, cpuCount uint8) ([]byte, []byte, []byte, error) {
 	// Fetch template based on CPU count.
 	fn := fmt.Sprintf("template_qemu_cpu%d.hex", cpuCount)
 
@@ -66,143 +60,11 @@ func GenerateTablesQemu2(memorySize uint64, cpuCount uint8) ([]byte, []byte, []b
 		return nil, nil, nil, err
 	}
 
-	// Handle memory split at 2816 MiB (0xB0000000).
-	/*
-		   lengthOffset := dsdtLen - 684           // Offset of the length field inside the DSDT table.
-		   rangeMinimumOffset := lengthOffset - 12 // Offset of the range minimum field inside the DSDT table.
-
-			if memorySize >= 2816 {
-				binary.LittleEndian.PutUint32(tpl[rangeMinimumOffset:], 0x80000000)
-				binary.LittleEndian.PutUint32(tpl[lengthOffset:], 0x60000000)
-			} else {
-				memSizeBytes := uint32(memorySize * 1024 * 1024) //nolint: gosec
-				binary.LittleEndian.PutUint32(tpl[rangeMinimumOffset:], memSizeBytes)
-				binary.LittleEndian.PutUint32(tpl[lengthOffset:], 0xe0000000-memSizeBytes)
-			}
-	*/
-
 	// Update RSDP with RSDT address.
 	var rsdtAddress [4]byte
 	binary.LittleEndian.PutUint32(rsdtAddress[:], rsdtOffset)
 	rsdp = append(rsdp, rsdtAddress[:]...)
 	fmt.Printf("RSDP: %s\n", rsdp)
-
-	// Generate table loader commands.
-	const ldrLength = 4096
-	ldr := qemuLoaderAppend(nil, &qemuLoaderCmdAllocate{"etc/acpi/rsdp", 16, 2})
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAllocate{"etc/acpi/tables", 64, 1})
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddChecksum{"etc/acpi/tables", dsdtCsum, dsdtOffset, dsdtLen}) // DSDT
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddPtr{"etc/acpi/tables", "etc/acpi/tables", facpOffset + 36, 4})
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddPtr{"etc/acpi/tables", "etc/acpi/tables", facpOffset + 40, 4})
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddPtr{"etc/acpi/tables", "etc/acpi/tables", facpOffset + 140, 8})
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddChecksum{"etc/acpi/tables", facpCsum, facpOffset, facpLen}) // FACP
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddChecksum{"etc/acpi/tables", apicCsum, apicOffset, apicLen}) // APIC
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddChecksum{"etc/acpi/tables", mcfgCsum, mcfgOffset, mcfgLen}) // MCFG
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddChecksum{"etc/acpi/tables", waetCsum, waetOffset, waetLen}) // WAET
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddPtr{"etc/acpi/tables", "etc/acpi/tables", rsdtOffset + 36, 4})
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddPtr{"etc/acpi/tables", "etc/acpi/tables", rsdtOffset + 40, 4})
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddPtr{"etc/acpi/tables", "etc/acpi/tables", rsdtOffset + 44, 4})
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddPtr{"etc/acpi/tables", "etc/acpi/tables", rsdtOffset + 48, 4})
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddChecksum{"etc/acpi/tables", rsdtCsum, rsdtOffset, rsdtLen}) // RSDT
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddPtr{"etc/acpi/rsdp", "etc/acpi/tables", 16, 4})             // RSDT address
-	ldr = qemuLoaderAppend(ldr, &qemuLoaderCmdAddChecksum{"etc/acpi/rsdp", 8, 0, 20})                        // RSDP
-	if len(ldr) < ldrLength {
-		ldr = append(ldr, bytes.Repeat([]byte{0x00}, ldrLength-len(ldr))...)
-	}
-
-	return tpl, rsdp, ldr, nil
-}
-
-// GenerateTablesQemu generates ACPI tables for the given TD configuration.
-//
-// Returns the raw ACPI tables, RSDP and QEMU table loader command blob.
-func GenerateTablesQemu(memorySize uint64, cpuCount uint8) ([]byte, []byte, []byte, error) {
-	// Load and decompress template data
-	templateGz, err := templates.ReadFile("templates.json.gz")
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to read template data: %w", err)
-	}
-
-	gr, err := gzip.NewReader(bytes.NewReader(templateGz))
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-	defer gr.Close()
-
-	templateJSON, err := io.ReadAll(gr)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to decompress template data: %w", err)
-	}
-
-	// Decode directly into a map instead of the TemplateData struct
-	templates := make(map[string]string)
-	if err := json.Unmarshal(templateJSON, &templates); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to parse template data: %w", err)
-	}
-
-	// Get template for CPU count
-	tplHex, ok := templates[fmt.Sprintf("%d", cpuCount)]
-	if !ok {
-		return nil, nil, nil, fmt.Errorf("template for %d CPUs is not available", cpuCount)
-	}
-
-	tpl, err := hex.DecodeString(tplHex)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("malformed ACPI table template, %w", err)
-	}
-
-	// Find all required ACPI tables.
-	dsdtOffset, dsdtCsum, dsdtLen, err := findAcpiTable(tpl, "DSDT")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	lengthOffset := dsdtLen - 0x2ac
-	rangeMinimumOffset := lengthOffset - 12
-
-	// Handle memory split at 2816 MiB (0xB0000000).
-	if memorySize >= 2816 {
-		binary.LittleEndian.PutUint32(tpl[rangeMinimumOffset:], 0x80000000)
-		binary.LittleEndian.PutUint32(tpl[lengthOffset:], 0x60000000)
-	} else {
-		memSizeBytes := uint32(memorySize * 1024 * 1024)
-		binary.LittleEndian.PutUint32(tpl[rangeMinimumOffset:], memSizeBytes)
-		binary.LittleEndian.PutUint32(tpl[lengthOffset:], 0xe0000000-memSizeBytes)
-	}
-
-	facpOffset, facpCsum, facpLen, err := findAcpiTable(tpl, "FACP")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	apicOffset, apicCsum, apicLen, err := findAcpiTable(tpl, "APIC")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	mcfgOffset, mcfgCsum, mcfgLen, err := findAcpiTable(tpl, "MCFG")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	waetOffset, waetCsum, waetLen, err := findAcpiTable(tpl, "WAET")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	rsdtOffset, rsdtCsum, rsdtLen, err := findAcpiTable(tpl, "RSDT")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// Generate RSDP.
-	rsdp := append([]byte{},
-		0x52, 0x53, 0x44, 0x20, 0x50, 0x54, 0x52, 0x20, // Signature ("RSDP PTR ").
-		0x00,                               // Checksum.
-		0x42, 0x4F, 0x43, 0x48, 0x53, 0x20, // OEM ID ("BOCHS ").
-		0x00, // Revision.
-	)
-
-	// Update RSDP with RSDT address.
-	var rsdtAddress [4]byte
-	binary.LittleEndian.PutUint32(rsdtAddress[:], rsdtOffset)
-	rsdp = append(rsdp, rsdtAddress[:]...)
 
 	// Generate table loader commands.
 	const ldrLength = 4096
