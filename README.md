@@ -2,7 +2,7 @@
 
 A CLI tool for calculating TDX (Intel Trust Domain Extensions) measurements for Dstack images.
 
-This project is based on [oasis-cli](https://github.com/oasisprotocol/cli) and [dstack-mr] ()
+This project is based on [oasis-cli](https://github.com/oasisprotocol/cli) and [dstack-mr](https://github.com/kvinwang/dstack-mr)
 
 ## Installation
 
