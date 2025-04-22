@@ -7,6 +7,7 @@ import (
 	"crypto/sha512"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -571,7 +572,7 @@ func replayRTMR(history []string) (string, error) {
 	return hex.EncodeToString(mr), nil
 }
 
-func MeasureTdxQemu(fwData, kernelData, initrdData, rootfsData, dockerCompose, dockerFiles []byte, memorySize uint64, cpuCount uint8, kernelCmdline string) (*TdxMeasurements, error) {
+func MeasureTdxQemu(fwData, kernelData, initrdData, rootfsData, dockerCompose, dockerFiles []byte, memorySize uint64, cpuCount uint8, kernelCmdline string, tcbver uint8) (*TdxMeasurements, error) {
 	// Parse TDVF metadata.
 	tdvfMeta, err := parseTdvfMetadata(fwData)
 	if err != nil {
@@ -581,8 +582,13 @@ func MeasureTdxQemu(fwData, kernelData, initrdData, rootfsData, dockerCompose, d
 	measurements := &TdxMeasurements{}
 
 	// Calculate MRTD
-	// use mrtdVariantTwoPass for TCB_SVN 6xx, and mrtdVariantSinglePass for 7xx
-	measurements.MRTD = tdvfMeta.computeMrtd(fwData, mrtdVariantSinglePass)
+	if tcbver == 7 {
+		measurements.MRTD = tdvfMeta.computeMrtd(fwData, mrtdVariantSinglePass)
+	} else if tcbver == 6 {
+		measurements.MRTD = tdvfMeta.computeMrtd(fwData, mrtdVariantTwoPass)
+	} else {
+		return nil, errors.New(fmt.Sprintf("Unsupported tcbver: %d", tcbver))
+	}
 
 	// RTMR0 calculation (existing code)
 	tdHobHash := measureTdxQemuTdHob(memorySize, tdvfMeta)
