@@ -89,6 +89,7 @@ func main() {
 		dockerFilesPath   string
 		memorySize        memoryValue = 2048 // 2G default (in MB)
 		cpuCountUint      uint
+		tcbver            uint
 		kernelCmdline     string
 		jsonOutput        bool
 		mrKeyProvider     string = defaultMrKeyProvider
@@ -101,6 +102,7 @@ func main() {
 	flag.StringVar(&dockerComposePath, "dockercompose", "", "Path to docker compose file")
 	flag.StringVar(&dockerFilesPath, "dockerfiles", "", "Path to docker files file")
 	flag.Var(&memorySize, "memory", "Memory size (e.g., 512M, 1G, 2G)")
+	flag.UintVar(&tcbver, "tcbver", 0, "TCB version (currently only 6 and 7 are supported)")
 	flag.UintVar(&cpuCountUint, "cpu", 1, "Number of CPUs")
 	flag.StringVar(&kernelCmdline, "cmdline", "", "Kernel command line")
 	flag.BoolVar(&jsonOutput, "json", false, "Output in JSON format")
@@ -167,7 +169,7 @@ func main() {
 		}
 	}
 	// Calculate measurements
-	measurements, err := internal.MeasureTdxQemu(fwData, kernelData, initrdData, rootfsData, dockerComposeData, dockerFilesData, uint64(memorySize), uint8(cpuCountUint), kernelCmdline)
+	measurements, err := internal.MeasureTdxQemu(fwData, kernelData, initrdData, rootfsData, dockerComposeData, dockerFilesData, uint64(memorySize), uint8(cpuCountUint), kernelCmdline, uint8(tcbver))
 	if err != nil {
 		fmt.Printf("Error calculating measurements: %v\n", err)
 		os.Exit(1)
