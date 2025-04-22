@@ -1,4 +1,4 @@
-# dstack-mr
+# reproduce-mr
 
 A CLI tool for calculating TDX (Intel Trust Domain Extensions) measurements for Dstack images.
 
@@ -14,12 +14,12 @@ go install github.com/scrtlabs/dstack-mr@latest
 
 You can either specify files directly using command line options:
 ```bash
-dstack-mr -fw firmware.bin -kernel vmlinuz [options]
+reproduce-mr -metadata metadata.json [options] -fw firmware.bin -kernel vmlinuz [options]
 ```
 
 Or use a Dstack metadata.json file:
 ```bash
-dstack-mr -metadata metadata.json [options]
+reproduce-mr -metadata metadata.json [options]
 ```
 
 ### Output Format
