@@ -2,12 +2,12 @@
 
 A CLI tool for calculating TDX (Intel Trust Domain Extensions) measurements for Dstack images.
 
-This project is based on [oasis-cli](https://github.com/oasisprotocol/cli) and modified for Dstack-specific TDX measurement requirements.
+This project is based on [oasis-cli](https://github.com/oasisprotocol/cli) and [dstack-mr] ()
 
 ## Installation
 
 ```bash
-go install github.com/scrtlabs/dstack-mr@latest
+go install github.com/scrtlabs/reproduce-mr@latest
 ```
 
 ## Usage
