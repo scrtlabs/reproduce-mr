@@ -2,7 +2,7 @@
 
 A CLI tool for calculating TDX (Intel Trust Domain Extensions) measurements for SecretVM images.
 
-This project is based on [dstack-mr](https://github.com/kvinwang/dstack-mr) and [oasis-cli](https://github.com/oasisprotocol/cli) and modified for SecretVM-specific TDX measurement requirements.
+This project is based on [oasis-cli](https://github.com/oasisprotocol/cli) and [dstack-mr](https://github.com/kvinwang/dstack-mr), modified for SecretVM-specific TDX measurement requirements.
 
 ## Installation
 
