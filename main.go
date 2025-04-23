@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kvinwang/dstack-mr/internal"
+	"github.com/scrtlabs/reproduce-mr/internal"
 )
 
 type measurementOutput struct {

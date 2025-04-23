@@ -1,8 +1,9 @@
 # reproduce-mr
 
-A CLI tool for calculating TDX (Intel Trust Domain Extensions) measurements for Dstack images.
+A CLI tool for calculating TDX (Intel Trust Domain Extensions) measurements for SecretVM images.
 
-This project is based on  [dstack-mr](https://github.com/kvinwang/dstack-mr) and [oasis-cli](https://github.com/oasisprotocol/cli)
+This project is based on [dstack-mr](https://github.com/kvinwang/dstack-mr) and [oasis-cli](https://github.com/oasisprotocol/cli) and modified for SecretVM-specific TDX measurement requirements.
+
 ## Installation
 
 ```bash
@@ -11,14 +12,9 @@ go install github.com/scrtlabs/reproduce-mr@latest
 
 ## Usage
 
-You can either specify files directly using command line options:
+You can specify files directly using command line options:
 ```bash
-reproduce-mr -metadata metadata.json [options] -fw firmware.bin -kernel vmlinuz [options]
-```
-
-Or use a Dstack metadata.json file:
-```bash
-reproduce-mr -metadata metadata.json [options]
+reproduce-mr -fw firmware.bin -kernel vmlinuz [options]
 ```
 
 ### Output Format
@@ -51,8 +47,9 @@ mr_image: fedcba9876543210...
 - `RTMR0`: Runtime Measurement Register 0
 - `RTMR1`: Runtime Measurement Register 1
 - `RTMR2`: Runtime Measurement Register 2
-- `mr_aggregated`: SHA256(MRTD + RTMR0 + RTMR1 + RTMR2)
-- `mr_image`: SHA256(MRTD + RTMR1 + RTMR2)
+- `RTMR3`: Runtime Measurement Register 3
+- `mr_aggregated`: SHA256(MRTD + RTMR0 + RTMR1 + RTMR2 + RTMR3)
+- `mr_image`: SHA256(MRTD + RTMR1 + RTMR2 + RTMR3)
 
 ## License
 
