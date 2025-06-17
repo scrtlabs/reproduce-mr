@@ -582,9 +582,9 @@ func MeasureTdxQemu(fwData, kernelData, initrdData, rootfsData, dockerCompose, d
 	measurements := &TdxMeasurements{}
 
 	// Calculate MRTD
-	if tcbver == 7 {
+	if tcbver == 6 {
 		measurements.MRTD = tdvfMeta.computeMrtd(fwData, mrtdVariantSinglePass)
-	} else if tcbver == 6 {
+	} else if tcbver == 7 {
 		measurements.MRTD = tdvfMeta.computeMrtd(fwData, mrtdVariantTwoPass)
 	} else {
 		return nil, errors.New(fmt.Sprintf("Unsupported tcbver: %d", tcbver))
