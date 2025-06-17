@@ -91,6 +91,7 @@ func main() {
 		cpuCountUint      uint
 		tcbver            uint
 		kernelCmdline     string
+		host              string
 		jsonOutput        bool
 		mrKeyProvider     string = defaultMrKeyProvider
 	)
@@ -105,6 +106,7 @@ func main() {
 	flag.UintVar(&tcbver, "tcbver", 0, "TCB version (currently only 6 and 7 are supported)")
 	flag.UintVar(&cpuCountUint, "cpu", 1, "Number of CPUs")
 	flag.StringVar(&kernelCmdline, "cmdline", "", "Kernel command line")
+	flag.StringVar(&host, "host", "", "Host machine name (e.g. ovh1, slabs1)")
 	flag.BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 	flag.StringVar(&mrKeyProvider, "mrkp", defaultMrKeyProvider, "Measurement of key provider")
 	flag.Parse()
@@ -169,7 +171,7 @@ func main() {
 		}
 	}
 	// Calculate measurements
-	measurements, err := internal.MeasureTdxQemu(fwData, kernelData, initrdData, rootfsData, dockerComposeData, dockerFilesData, uint64(memorySize), uint8(cpuCountUint), kernelCmdline, uint8(tcbver))
+	measurements, err := internal.MeasureTdxQemu(fwData, kernelData, initrdData, rootfsData, dockerComposeData, dockerFilesData, uint64(memorySize), uint8(cpuCountUint), kernelCmdline, host, uint8(tcbver))
 	if err != nil {
 		fmt.Printf("Error calculating measurements: %v\n", err)
 		os.Exit(1)

@@ -12,9 +12,9 @@ import (
 //go:embed template_qemu_cpu*.hex
 var templateFiles embed.FS
 
-func GenerateTablesQemu(memorySize uint64, cpuCount uint8) ([]byte, []byte, []byte, error) {
+func GenerateTablesQemu(host string, memorySize uint64, cpuCount uint8) ([]byte, []byte, []byte, error) {
 	// Fetch template based on CPU count.
-	fn := fmt.Sprintf("template_qemu_cpu%d.hex", cpuCount)
+	fn := fmt.Sprintf("template_qemu_cpu%d_%s.hex", cpuCount, host)
 
 	tplHex, err := templateFiles.ReadFile(fn)
 	if err != nil {
