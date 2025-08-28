@@ -53,4 +53,4 @@ mr_image: fedcba9876543210...
 
 ## License
 
-Apache License 2.0
+https://github.com/scrtlabs/secret-vm-attest-rest-server/blob/master/LICENSE
