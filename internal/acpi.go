@@ -2,21 +2,19 @@ package internal
 
 import (
 	"bytes"
-	"embed"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
-//go:embed template_qemu_cpu*.hex
-var templateFiles embed.FS
-
-func GenerateTablesQemu(host string, memorySize uint64, cpuCount uint8) ([]byte, []byte, []byte, error) {
+func GenerateTablesQemu(templatesPath string, memorySize uint64, cpuCount uint8) ([]byte, []byte, []byte, error) {
 	// Fetch template based on CPU count.
-	fn := fmt.Sprintf("template_qemu_cpu%d_%s.hex", cpuCount, host)
+	fn := fmt.Sprintf("template_qemu_cpu%d.hex", cpuCount)
 
-	tplHex, err := templateFiles.ReadFile(fn)
+	tplHex, err := os.ReadFile(filepath.Join(templatesPath, fn))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("template for ACPI tables is not available: %w", err)
 	}
@@ -138,7 +136,7 @@ type qemuLoaderCmdAddChecksum struct {
 	length       uint32
 }
 
-func qemuLoaderAppend(data []byte, cmd interface{}) []byte {
+func qemuLoaderAppend(data []byte, cmd any) []byte {
 	appendFixedString := func(str string) {
 		const fixedLength = 56
 		data = append(data, []byte(str)...)
